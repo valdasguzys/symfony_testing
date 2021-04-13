@@ -1,43 +1,52 @@
 <?php
 
+
 namespace App\Tests;
-
 use App\Entity\Book;
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
-class BookManagementTest extends KernelTestCase 
+class BookManagementTest extends WebTestCase 
 {
     private $entityManager;
 
-    public function setUp(): void
-    {   
+    private $client;
+
+    public function setUp(): void 
+    {
+        $this->client = static::createClient();
         $kernel = self::bootKernel();
         DatabasePrimer::prime($kernel);
         $this->entityManager = $kernel->getContainer()->get('doctrine')->getManager();
     }
- 
-    public function tearDown(): void {
+
+    public function tearDown(): void 
+    {
         parent::tearDown();
         $this->entityManager->close();
         $this->entityManager == null;
     }
 
-    /** @test  */
-    public function book_can_be_added()
-     {
-        // given
-        $book = new Book();
-        $book->setIsbn('595145151');
-        $book->setTitle('Holy Bible');
-
-        // when 
-        $this->entityManager->persist($book);
-        $this->entityManager->flush();
-
+    /** @test */
+    public function books_can_be_retrieved()
+    {
+        // given / when
+        $this->client->request('GET', '/book');
         // then
-        $booksRepo = $this->entityManager->getRepository(Book::class);
-        $bookRetrived = $booksRepo->findOneBy(['title' => 'Holy Bible']);    
-        $this->assertEquals('595145151', $bookRetrived->getIsbn());
-        $this->assertEquals('Holy Bible', $bookRetrived->getTitle());
+        $this->assertEquals(200, $this->client->getResponse()->getStatusCode());
+        $this->assertEquals('[]', $this->client->getResponse()->getContent());
+    }
+
+    /** @test */
+    public function book_can_be_added()
+    {
+        // given / when
+        $this->client->request('POST', '/book', [], [], 
+                ['CONTENT_TYPE' => 'application/json'], 
+                '{"isbn":"111", "title": "Optimal"}');
+        // then
+        $this->assertEquals(201, $this->client->getResponse()->getStatusCode());
+        $this->assertEquals('{"status":"Book created!"}', $this->client->getResponse()->getContent());
+        $this->client->request('GET', '/book');
+        $this->assertEquals('[{"isbn":"111","title":"Optimal"}]', $this->client->getResponse()->getContent());
     }
 }
